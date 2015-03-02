@@ -31,5 +31,25 @@ pooledFeatures = zeros(convolvedDim / poolDim, ...
 
 %%% YOUR CODE HERE %%%
 
+for imageNum = 1:numImages
+  for filterNum = 1:numFilters
+
+    % Obtain the pooling filter
+    filter = ones(poolDim,poolDim)./(poolDim^2);
+
+    % Flip the feature matrix because of the definition of convolution, as explained later
+    filter = rot90(squeeze(filter),2);
+      
+    % Obtain the image
+    im = squeeze(convolvedFeatures(:, :, imageNum));
+
+    % Convolve "filter" with "im", adding the result to convolvedImage
+    % be sure to do a 'valid' convolution
+    pooledImage = conv2(im, filter);
+    % get the valid pool!
+    pooledFeatures(:, :, filterNum, imageNum) = pooledImage(poolDim:poolDim:convolvedDim,poolDim:poolDim:convolvedDim);
+  end
+end
+
 end
 

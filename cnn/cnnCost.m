@@ -30,6 +30,9 @@ end;
 imageDim = size(images,1); % height/width of image
 numImages = size(images,3); % number of images
 
+% activationType = 'relu'; % Elapsed time is 395.22254 seconds. Accuracy is 98.34, 98.62(mean-normalized data)
+activationType = 'sigmoid'; % Elapsed time is 436.91066 seconds. Accuracy is 97.00
+
 %% Reshape parameters and setup gradient matrices
 
 % Wc is filterDim x filterDim x numFilters parameter matrix
@@ -72,6 +75,43 @@ activations = zeros(convDim,convDim,numFilters,numImages);
 activationsPooled = zeros(outputDim,outputDim,numFilters,numImages);
 
 %%% YOUR CODE HERE %%%
+% WHY THIS IS WRONG ???
+% % we do activation at convolution layer
+% activations = cnnConvolve(filterDim, numFilters, images, Wc, bc);
+% % but we dont use activation at pool layer
+% activationsPooled = cnnPool(poolDim, activations);
+
+
+Wc_rotated = zeros(size(Wc));
+for filterNum = 1 : numFilters
+    Wc_rotated(:, :, filterNum) = rot90(Wc(:, :, filterNum), 2);
+end
+
+meanPoolingFilter = ones(poolDim)/poolDim ^ 2;
+poolingIndex = 1 : poolDim : size(conv2(conv2(images(:, :, 1), Wc_rotated(:, :, 1), 'valid'), meanPoolingFilter, 'valid'), 1);
+
+for imageNum = 1 : numImages
+    image = images(:, :, imageNum);
+    for filterNum = 1 : numFilters
+        %         filter = Wc_rotated(:, :, filterNum);
+        %         filteredImage = conv2(image, filter, 'valid');
+        
+        convolveImage = conv2(image, Wc_rotated(:, :, filterNum), 'valid') + bc(filterNum);
+        
+        switch activationType
+            case 'relu'
+                convolveImage = max(convolveImage, 0); % relu
+            case 'sigmoid'
+                convolveImage = sigmoid(convolveImage); % sigmoid
+        end
+        % the main reason why I was wrong !
+        % cannot directly assign a calculation to a different dimension matrix !
+        % for example, resulted 2D cannnot be directly assign to 4D matrix
+        activations(:, :, filterNum, imageNum) = convolveImage;
+        pooledImage = conv2(convolveImage, meanPoolingFilter, 'valid');
+        activationsPooled(:, :, filterNum, imageNum) = pooledImage(poolingIndex, poolingIndex);
+    end
+end
 
 % Reshape activations into 2-d matrix, hiddenSize x numImages,
 % for Softmax layer
@@ -89,6 +129,13 @@ probs = zeros(numClasses,numImages);
 
 %%% YOUR CODE HERE %%%
 
+% (numClasses x hiddenSize) * (hiddenSize x numImages)
+activationsSoftmax = Wd * activationsPooled + repmat(bd, 1, numImages);
+% activationsSoftmax = bsxfun(@plus, Wd * activationsPooledReshaped, bd);
+activationsSoftmax = bsxfun(@minus, activationsSoftmax, max(activationsSoftmax));
+activationsSoftmax = exp(activationsSoftmax);
+probs = bsxfun(@rdivide, activationsSoftmax, sum(activationsSoftmax));
+
 %%======================================================================
 %% STEP 1b: Calculate Cost
 %  In this step you will use the labels given as input and the probs
@@ -98,6 +145,11 @@ probs = zeros(numClasses,numImages);
 cost = 0; % save objective into cost
 
 %%% YOUR CODE HERE %%%
+
+labels = full(sparse(labels,1:numImages,1));
+
+cost = -sum(sum(labels .* log(probs)));
+cost = cost / numImages;
 
 % Makes predictions given probs and returns without backproagating errors.
 if pred
@@ -119,6 +171,36 @@ end;
 
 %%% YOUR CODE HERE %%%
 
+% Backpropagate through the softmax layer
+errorsSoftmax = probs - labels;
+errorsSoftmax = errorsSoftmax / numImages;
+
+% Backpropagate through the mean pooling layer
+errorsPooled = Wd' * errorsSoftmax;
+errorsPooled = reshape(errorsPooled, [], outputDim, numFilters, numImages);
+
+errorsPooling = zeros(convDim, convDim, numFilters, numImages);
+% unpoolingFilter = ones(poolDim);
+% unpoolingFilter = unpoolingFilter / poolDim ^ 2;
+% the upsampling filter is still meanPooling filter
+for imageNum = 1:numImages
+    % for imageNum = 1:numImages
+    for filterNum = 1:numFilters
+        error = errorsPooled(:, :, filterNum, imageNum);
+        errorsPooling(:, :, filterNum, imageNum) = kron(error, meanPoolingFilter);
+        
+        %         errorsPooling(:, :, filterNum, imageNum) = kron(errorsPooled(:, :, filterNum, imageNum), unpoolingFilter);
+    end
+end
+
+switch activationType
+    case 'relu'
+        errorsConvolution = errorsPooling .* (activations > 0); % relu derivative = x > 1
+    case 'sigmoid'
+        errorsConvolution = errorsPooling .* activations .* (1 - activations); % sigmoid derivative = x .* (1 - x)
+end
+
+
 %%======================================================================
 %% STEP 1d: Gradient Calculation
 %  After backpropagating the errors above, we can use them to calculate the
@@ -128,6 +210,48 @@ end;
 %  for that filter with each image and aggregate over images.
 
 %%% YOUR CODE HERE %%%
+
+% Gradient of the softmax layer
+Wd_grad = errorsSoftmax * activationsPooled';
+bd_grad = sum(errorsSoftmax, 2);
+
+% for filterNum = 1 : numFilters
+%     Wc_grad_temp = zeros(size(Wc_grad, 1), size(Wc_grad, 2));
+%     for imageNum = 1: numImages
+%         error = errorsConvolution(:, :, filterNum, imageNum);
+%         Wc_grad_temp = Wc_grad(:, :, filterNum) + conv2(images(:, :, imageNum), error, 'valid');
+%     end
+%     Wc_grad(:, :, filterNum) = Wc_grad_temp;
+% end
+
+for filterNum = 1 : numFilters
+    for imageNum = 1 : numImages
+        e = errorsConvolution(:, :, filterNum, imageNum);
+        %         e = errorsPooling(:, :, filterNum, imageNum);
+        errorsConvolution(:, :, filterNum, imageNum) = rot90(e, 2);
+        
+        %         errorsPooling(:, :, filterNum, imageNum) = rot90(errorsPooling(:, :, filterNum, imageNum), 2);
+    end
+end
+
+for filterNum = 1 : numFilters
+    Wc_gradFilter = zeros(size(Wc_grad, 1), size(Wc_grad, 2));
+    for imageNum = 1 : numImages
+        %                 image = images(:, :, imageNum);
+        %                 error = errorsPooling(:, :, filterNum, imageNum);
+        %         %         Wc_grad(:, :, filterNum) = Wc_grad(:, :, filterNum) + conv2(image, error, 'valid');
+        %         Wc_gradFilter(:, :, imageNum) = conv2(image, error, 'valid');
+        %         Wc_gradFilter(:, :, imageNum) = conv2(images(:, :, imageNum), errorsPooling(:, :, filterNum, imageNum), 'valid');
+        
+        Wc_gradFilter = Wc_gradFilter + conv2(images(:, :, imageNum), errorsConvolution(:, :, filterNum, imageNum), 'valid');
+        %         Wc_gradFilter = Wc_gradFilter + conv2(image, error, 'valid');
+    end
+    %     Wc_grad(:, :, filterNum) = sum(Wc_gradFilter, 3) / numImages + regularization;
+    Wc_grad(:, :, filterNum) = Wc_gradFilter;
+end
+
+bc_grad = reshape(sum(sum(sum(errorsConvolution,4),2),1),[],numFilters);
+
 
 %% Unroll gradient into grad vector for minFunc
 grad = [Wc_grad(:) ; Wd_grad(:) ; bc_grad(:) ; bd_grad(:)];
