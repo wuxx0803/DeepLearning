@@ -19,3 +19,11 @@ function [f,g] = logistic_regression_vec(theta, X,y)
   %        Store the objective function value in 'f', and the gradient in 'g'.
   %
 %%% YOUR CODE HERE %%%
+  for i = 1:m
+      f = f - y(i)*log2(sigmoid(theta'*X(:,i))) - (1-y(i))*log2(1-sigmoid(theta'*X(:,i)));
+      g = g + X(:,i) * (sigmoid(theta'*X(:,i)) - y(i));
+  end
+  
+  f = - y *log2(sigmoid(theta'*X))' - (1-y)*log2(1-sigmoid(theta'*X))';
+  g = X*(sigmoid(theta'*X-y))';
+end
