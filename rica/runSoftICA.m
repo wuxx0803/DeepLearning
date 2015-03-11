@@ -1,6 +1,6 @@
 %% We will use minFunc for this exercise, but you can use your
 % own optimizer of choice
-clear all;
+clear;
 addpath(genpath('../common/')) % path to minfunc
 %% These parameters should give you sane results. We recommend experimenting
 % with these values after you have a working solution.
@@ -33,7 +33,7 @@ x = bsxfunwrap(@rdivide,patches,m);
 %% Run the optimization
 options.Method = 'lbfgs';
 options.MaxFunEvals = Inf;
-options.MaxIter = 500;
+options.MaxIter = 1500;
 %options.display = 'off';
 options.outputFcn = @showBases;
 
