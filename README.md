@@ -8,4 +8,7 @@ Programming exercises for the Stanford Unsupervised Feature Learning and Deep Le
 This repository contains starter code for the tutorial at http://ufldl.stanford.edu/tutorial
 
 =============
+
 2. Stanford CS231n: Convolutional Neural Networks for Visual Recognition
+=============
+=============
