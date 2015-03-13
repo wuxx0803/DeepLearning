@@ -1,4 +1,6 @@
-stanford_dl_ex
+This repository contains Machine Learning Exercise from various good tutotial or assignmets:
+
+1.stanford_dl_ex
 ==============
 
 Programming exercises for the Stanford Unsupervised Feature Learning and Deep Learning Tutorial
@@ -9,3 +11,5 @@ If you have suggestions, questions, or bug reports, please submit contact:
 
 Andrew Maas ( amaas AT cs dot stanford.edu)
 Sameep Tandon (sameep AT stanford dot edu)
+
+2. Stanford CS231n: Convolutional Neural Networks for Visual Recognition
